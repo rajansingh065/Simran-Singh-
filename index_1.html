@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#020b1a">
+<title>SIMRAN AI</title>
+<style>
+:root{--bg:#020b1a;--c:#00d4ff;--c2:#0077ff;--t:#d6f6ff;--p:rgba(0,212,255,.08);box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#020b1a}}
+*{box-sizing:border-box;margin:0}
+html,body{height:100%;background:var(--bg);color:var(--t);font-family:system-ui,"Noto Sans Devanagari",sans-serif;overflow:hidden}
+body{background:radial-gradient(circle at 50% 28%,#06284d 0,var(--bg) 70%);display:flex;flex-direction:column}
+header{text-align:center;padding:10px;letter-spacing:6px;font-weight:700;color:var(--c);text-shadow:0 0 12px var(--c)}
+header small{display:block;letter-spacing:2px;font-size:11px;opacity:.7;font-weight:400}
+#orbWrap{display:flex;justify-content:center;padding:6px 0}
+#orb{width:130px;height:130px;border-radius:50%;border:2px solid var(--c);position:relative;box-shadow:0 0 30px var(--c),inset 0 0 30px var(--c2);animation:spin 8s linear infinite;background:radial-gradient(circle,rgba(0,212,255,.35),transparent 70%)}
+#orb::before,#orb::after{content:"";position:absolute;inset:12px;border-radius:50%;border:2px dashed var(--c);animation:spin 5s linear infinite reverse}
+#orb::after{inset:30px;border-style:dotted;animation-duration:3s}
+#orb.on{animation-duration:1.5s;box-shadow:0 0 60px var(--c),inset 0 0 40px var(--c)}
+@keyframes spin{to{transform:rotate(360deg)}}
+#status{text-align:center;font-size:13px;color:var(--c);min-height:20px}
+#log{flex:1;overflow-y:auto;padding:10px 14px;display:flex;flex-direction:column;gap:8px}
+.m{max-width:85%;padding:9px 12px;border-radius:12px;border:1px solid rgba(0,212,255,.4);background:var(--p);font-size:15px;line-height:1.45;word-wrap:break-word}
+.u{align-self:flex-end;background:rgba(0,119,255,.25)}
+.m a{color:var(--c);font-weight:700}
+.m img,.m video{max-width:100%;border-radius:8px;margin-top:6px}
+#bar{display:flex;gap:8px;padding:8px 10px;border-top:1px solid rgba(0,212,255,.3)}
+#txt{flex:1;background:var(--p);border:1px solid var(--c);color:var(--t);border-radius:22px;padding:10px 14px;font-size:15px;outline:none}
+button{background:linear-gradient(135deg,var(--c2),var(--c));border:0;color:#001;font-weight:700;border-radius:50%;width:46px;height:46px;font-size:20px}
+#mic{width:56px;height:56px;box-shadow:0 0 18px var(--c)}
+.chips{display:flex;gap:6px;overflow-x:auto;padding:4px 10px}
+.chips span{white-space:nowrap;border:1px solid var(--c);border-radius:16px;padding:5px 10px;font-size:12px;color:var(--c)}
+</style>
+</head>
+<body>
+<header>SIMRAN AI<small>तैयार हूँ, बोलिए</small></header>
+<div id="orbWrap"><div id="orb"></div></div>
+<div id="status">माइक दबाइए और बोलिए</div>
+<div id="log"></div>
+<div class="chips" id="chips">
+<span>यूट्यूब खोलो</span><span>व्हाट्सऐप खोलो</span><span>खोजो भारत की राजधानी</span><span>कैमरा खोलो</span><span>समय क्या हुआ</span>
+</div>
+<div id="bar">
+<input id="txt" placeholder="यहाँ लिखिए…" autocomplete="off">
+<button id="send" aria-label="भेजें">➤</button>
+<button id="mic" aria-label="बोलिए">🎤</button>
+</div>
+<input type="file" id="cam" accept="image/*" capture="environment" hidden>
+<script>
+const $=id=>document.getElementById(id),log=$('log'),st=$('status'),orb=$('orb');
+let history=[],stream=null;
+
+function add(html,me){const d=document.createElement('div');d.className='m'+(me?' u':'');d.innerHTML=html;log.appendChild(d);log.scrollTop=log.scrollHeight;return d}
+function esc(s){return s.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}
+
+/* ---- आवाज़ में बोलना (TTS) ---- */
+function speak(t){
+  try{
+    speechSynthesis.cancel();
+    const u=new SpeechSynthesisUtterance(t);u.lang='hi-IN';u.rate=1;
+    const v=speechSynthesis.getVoices().find(v=>v.lang&&v.lang.toLowerCase().startsWith('hi'));
+    if(v)u.voice=v;
+    u.onstart=()=>orb.classList.add('on');u.onend=()=>orb.classList.remove('on');
+    speechSynthesis.speak(u);
+  }catch(e){}
+}
+function say(t,html){add(html||esc(t));speak(t)}
+
+/* ---- ऐप खोलना ---- */
+const apps={
+ 'यूट्यूब':['YouTube','https://www.youtube.com'],'youtube':['YouTube','https://www.youtube.com'],
+ 'व्हाट्सऐप':['WhatsApp','https://wa.me/'],'वाट्सएप':['WhatsApp','https://wa.me/'],'whatsapp':['WhatsApp','https://wa.me/'],
+ 'गूगल':['Google','https://www.google.com'],'मैप':['Maps','https://maps.google.com'],
+ 'जीमेल':['Gmail','https://mail.google.com'],'इंस्टाग्राम':['Instagram','https://www.instagram.com'],
+ 'फेसबुक':['Facebook','https://www.facebook.com'],'क्रोम':['Chrome','https://www.google.com']
+};
+function openLink(name,url){
+  say(name+' खोल रही हूँ','<a href="'+url+'" target="_blank" rel="noopener">▶ '+name+' खोलें</a>');
+  try{window.open(url,'_blank')}catch(e){}
+}
+
+/* ---- कैमरा ---- */
+async function camera(){
+  say('कैमरा खोल रही हूँ');
+  try{
+    stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
+    const d=add('<video autoplay playsinline muted></video><br><a href="#" id="snap">📸 फोटो लें</a> · <a href="#" id="stop">बंद करें</a>');
+    const v=d.querySelector('video');v.srcObject=stream;
+    d.querySelector('#snap').onclick=e=>{e.preventDefault();const c=document.createElement('canvas');c.width=v.videoWidth;c.height=v.videoHeight;c.getContext('2d').drawImage(v,0,0);add('<img src="'+c.toDataURL('image/jpeg',.8)+'">');speak('फोटो ले ली')};
+    d.querySelector('#stop').onclick=e=>{e.preventDefault();stream.getTracks().forEach(t=>t.stop());d.remove()};
+  }catch(e){$('cam').click()}
+}
+$('cam').onchange=e=>{const f=e.target.files[0];if(f){add('<img src="'+URL.createObjectURL(f)+'">');speak('फोटो मिल गई')}};
+
+/* ---- आदेश समझना ---- */
+async function handle(q){
+  q=q.trim();if(!q)return;
+  add(esc(q),true);
+  const l=q.toLowerCase();
+  if(/खोल|चालू|open|चलाओ|start/.test(l)){
+    if(/कैमरा|camera/.test(l))return camera();
+    for(const k in apps)if(l.includes(k))return openLink(...apps[k]);
+  }
+  if(/खोज|सर्च|search|ढूंढ|ढूँढ/.test(l)){
+    const s=q.replace(/खोजो|खोज|सर्च करो|सर्च|search|ढूंढो|ढूँढो|के बारे में|इंटरनेट पर|गूगल पर/gi,'').trim()||q;
+    return openLink('"'+s+'" की खोज','https://www.google.com/search?q='+encodeURIComponent(s));
+  }
+  if(/समय|टाइम|time/.test(l))return say('अभी समय है '+new Date().toLocaleTimeString('hi-IN',{hour:'numeric',minute:'2-digit'}));
+  if(/तारीख|दिनांक|date|आज कौन सा दिन/.test(l))return say('आज '+new Date().toLocaleDateString('hi-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'}));
+  return chat(q);
+}
+
+/* ---- AI से सामान्य बातचीत (Gemini मुफ़्त API) ---- */
+const MODEL='gemini-2.5-flash'; // बदलना हो तो सिर्फ़ यह नाम बदलिए
+const SYS='तुम SIMRAN AI हो, JARVIS जैसी एक विनम्र, समझदार महिला AI असिस्टेंट। हमेशा सरल हिंदी में, 2-3 छोटे वाक्यों में जवाब दो, बिना markdown के।';
+async function chat(q){
+  const wait=add('सोच रही हूँ…');st.textContent='सोच रही हूँ…';
+  try{
+    let key=localStorage.getItem('simran_key');
+    if(!key){
+      key=(prompt('मुफ़्त Gemini API key यहाँ चिपकाइए (aistudio.google.com/apikey से मिलती है):')||'').replace(/\s+/g,'');
+      if(!key)throw new Error('NOKEY');
+      localStorage.setItem('simran_key',key);
+    }
+    history.push({role:'user',content:q});
+    const contents=history.slice(-10).map(m=>({role:m.role=='user'?'user':'model',parts:[{text:m.content}]}));
+    const r=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+MODEL+':generateContent',{
+      method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},
+      body:JSON.stringify({systemInstruction:{parts:[{text:SYS}]},contents})
+    });
+    const j=await r.json();
+    if(!r.ok){if(r.status==400||r.status==403)localStorage.removeItem('simran_key');throw new Error((j.error&&j.error.message)||('HTTP '+r.status))}
+    const t=j.candidates[0].content.parts.map(p=>p.text||'').join('').trim();
+    wait.remove();history.push({role:'assistant',content:t});say(t);
+  }catch(e){
+    wait.remove();history.pop&&history[history.length-1]&&history[history.length-1].role=='user'&&history.pop();
+    say(e.message=='NOKEY'?'AI बातचीत के लिए Gemini API key चाहिए। दोबारा पूछिए और key डालिए।':'AI से जवाब नहीं मिला: '+e.message);
+  }
+  st.textContent='माइक दबाइए और बोलिए';
+}
+
+/* ---- आवाज़ सुनना (STT) ---- */
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+let rec=null,listening=false,gotText=false;
+const mic=$('mic'),HINT=' (विकल्प: कीबोर्ड के 🎤 से बोलकर लिखिए।)';
+function err(m){st.textContent='⚠ '+m;add('⚠ '+esc(m))}
+function setMic(on){listening=on;mic.textContent=on?'⏹':'🎤';orb.classList.toggle('on',on)}
+async function diagnose(){
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia)return 'इस व्यू में माइक बंद है। इस लिंक को सीधे Chrome ब्राउज़र में खोलिए।'+HINT;
+  try{const s=await navigator.mediaDevices.getUserMedia({audio:true});s.getTracks().forEach(t=>t.stop());
+    return 'माइक की अनुमति ठीक है, पर आवाज़ पहचान सेवा बंद है। Chrome में खोलिए और Google ऐप अपडेट कीजिए।'+HINT}
+  catch(e){return e.name=='NotAllowedError'||e.name=='SecurityError'
+    ?'माइक की अनुमति नहीं मिली। Chrome में पता-पट्टी के 🔒 पर माइक Allow कीजिए, या फोन Settings → Apps → Chrome → Permissions → Microphone।'+HINT
+    :'माइक नहीं मिला ('+e.name+')। कोई दूसरा ऐप माइक इस्तेमाल कर रहा हो सकता है।'}
+}
+mic.onclick=()=>{
+  if(listening){try{rec.stop()}catch(e){}setMic(false);st.textContent='माइक दबाइए और बोलिए';return}
+  if(!SR)return err('इस ब्राउज़र में आवाज़ पहचान नहीं है। कृपया लिंक को Chrome में खोलिए।'+HINT);
+  if(!window.isSecureContext)return err('पेज सुरक्षित (https) नहीं है, इसलिए माइक नहीं चलेगा।');
+  try{speechSynthesis.cancel()}catch(e){}
+  gotText=false;
+  try{
+    rec=new SR();rec.lang='hi-IN';rec.continuous=false;rec.interimResults=false;rec.maxAlternatives=1;
+    rec.onstart=()=>{st.textContent='सुन रही हूँ…';setMic(true)};
+    rec.onresult=e=>{gotText=true;handle(e.results[0][0].transcript)};
+    rec.onend=()=>{setMic(false);if(st.textContent=='सुन रही हूँ…')st.textContent='माइक दबाइए और बोलिए'};
+    rec.onerror=async e=>{
+      setMic(false);
+      const k=e.error;
+      if(k=='aborted')return;
+      if(k=='no-speech')return err('कुछ सुनाई नहीं दिया। माइक दबाकर फिर बोलिए।');
+      if(k=='audio-capture')return err('माइक नहीं मिला। दूसरा ऐप माइक इस्तेमाल कर रहा हो सकता है।');
+      if(k=='network')return err('आवाज़ पहचान के लिए इंटरनेट चाहिए।');
+      if(k=='language-not-supported')return err('हिंदी समर्थित नहीं है। Google ऐप अपडेट कीजिए।'+HINT);
+      if(k=='not-allowed'||k=='service-not-allowed')return err(await diagnose());
+      err('माइक में समस्या: '+k);
+    };
+    rec.start();
+  }catch(e){setMic(false);err('माइक शुरू नहीं हो सका: '+e.message+HINT)}
+};
+$('send').onclick=()=>{handle($('txt').value);$('txt').value=''};
+$('txt').onkeydown=e=>{if(e.key=='Enter')$('send').onclick()};
+$('chips').onclick=e=>{if(e.target.tagName=='SPAN')handle(e.target.textContent)};
+add('नमस्ते! मैं SIMRAN AI हूँ। मैं ऐप खोल सकती हूँ, इंटरनेट पर खोज सकती हूँ, कैमरा चला सकती हूँ और आपसे बात कर सकती हूँ।');
+</script>
+</body>
+</html>
