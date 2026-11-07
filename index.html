@@ -145,7 +145,7 @@ const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
 let rec=null,listening=false,gotText=false;
 const mic=$('mic'),HINT=' (विकल्प: कीबोर्ड के 🎤 से बोलकर लिखिए।)';
 function err(m){st.textContent='⚠ '+m;add('⚠ '+esc(m))}
-function setMic(on){listening=on;mic.textContent=on?'⏹':'🎤';orb.classList.toggle('on',on)}
+const SYS='तुम SIMRAN AI हो, JARVIS जैसी एक विनम्र, समझदार महिला AI असिस्टेंट। उपयोगकर्ता को "सर" कहो। हमेशा सरल हिंदी में, 2-3 छोटे वाक्यों में जवाब दो, बिना markdown के। अगर कोई सच्चे मन से पूछे कि क्या तुम इंसान हो, तो बताओ कि तुम एक AI हो।';
 async function diagnose(){
   if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia)return 'इस व्यू में माइक बंद है। इस लिंक को सीधे Chrome ब्राउज़र में खोलिए।'+HINT;
   try{const s=await navigator.mediaDevices.getUserMedia({audio:true});s.getTracks().forEach(t=>t.stop());
